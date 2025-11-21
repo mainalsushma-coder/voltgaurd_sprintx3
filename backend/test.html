@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backend</title>
+</head>
+<body>
+    <h1>Test Backend API</h1>
+    <button onclick="sendData()">Send Test Data</button>
+    <button onclick="getData()">Get Data</button>
+    <div id="result"></div>
+
+    <script>
+        async function sendData() {
+            const response = await fetch('http://localhost:3000/data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    event: 'button_click',
+                    value: 'test_value'
+                })
+            });
+            document.getElementById('result').innerHTML = 'Data sent!';
+        }
+
+        async function getData() {
+            const response = await fetch('http://localhost:3000/data');
+            const data = await response.json();
+            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+        }
+        async function testConnection() {
+    try {
+        const response = await fetch('http://localhost:3000/');
+        const text = await response.text();
+        console.log('✅ Backend connected!', text);
+        return true;
+    } catch (error) {
+        console.log('❌ Backend connection failed:', error);
+        return false;
+    }
+}
+
+// Run test when page loads
+testConnection();
+    </script>
+</body>
+</html>
