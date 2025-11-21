@@ -1,0 +1,9 @@
+{
+  "name": "microblackout-backend",
+  "version": "1.0.0",
+  "description": "Voltage tracking backend",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

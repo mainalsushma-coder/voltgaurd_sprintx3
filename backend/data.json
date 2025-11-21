@@ -1,0 +1,57 @@
+[
+  {
+    "event": "Voltage Reading",
+    "value": 228.5,
+    "time": "2025-11-21 10:00:01"
+  },
+  {
+    "event": "Voltage Fluctuation",
+    "value": 195.3,
+    "time": "2025-11-21 10:00:12"
+  },
+  {
+    "event": "Voltage Reading",
+    "value": 220.1,
+    "time": "2025-11-21 10:00:25"
+  },
+  {
+    "event": "Voltage Spike",
+    "value": 264.8,
+    "time": "2025-11-21 10:00:33"
+  },
+  {
+    "event": "Voltage Reading",
+    "value": 230.2,
+    "time": "2025-11-21 10:00:40"
+  },
+  {
+    "event": "Microblackout Start",
+    "value": 0,
+    "time": "2025-11-21 10:01:10"
+  },
+  {
+    "event": "Microblackout End",
+    "value": 3.2,
+    "time": "2025-11-21 10:01:13"
+  },
+  {
+    "event": "Microblackout",
+    "value": 3.2,
+    "time": "2025-11-21 10:01:13"
+  },
+  {
+    "event": "Voltage Reading",
+    "value": 231.4,
+    "time": "2025-11-21 10:01:17"
+  },
+  {
+    "event": "Voltage Fluctuation",
+    "value": 178.2,
+    "time": "2025-11-21 10:01:26"
+  },
+  {
+    "event": "Voltage Reading",
+    "value": 223.5,
+    "time": "2025-11-21 10:01:35"
+  }
+]

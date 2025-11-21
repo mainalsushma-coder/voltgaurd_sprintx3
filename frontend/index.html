@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Voltage Tracker Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h2>Microblackout & Voltage Fluctuation Tracking Dashboard</h2>
+<canvas id="chart" width="600" height="300"></canvas>
+
+<script>
+async function fetchData() {
+    const res = await fetch("http://YOUR_IP:3000/data");
+    return await res.json();
+}
+
+async function plot() {
+    let logs = await fetchData();
+    let times = logs.map(x => x.time);
+    let values = logs.map(x => x.value);
+
+    new Chart(document.getElementById("chart"), {
+        type: "line",
+        data: {
+            labels: times,
+            datasets: [{
+                label: "Voltage / Event Value",
+                data: values
+            }]
+        }
+    });
+}
+
+setInterval(plot, 3000);
+</script>
+
+</body>
+</html>
