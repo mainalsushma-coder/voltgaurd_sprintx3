@@ -1026,13 +1026,32 @@ function App() {
               <div className="predictions-header">
                 <h2>🔮 AI-Powered Predictions</h2>
                 <p>Smart forecasts based on historical incident patterns</p>
+                <div className="prediction-controls">
+                  <button onClick={fetchAllData} className="refresh-btn" disabled={isLoading}>
+                    {isLoading ? '🔄 Refreshing...' : '🔄 Refresh Predictions'}
+                  </button>
+                  <span className="last-updated">
+                    Last updated: {new Date().toLocaleTimeString()}
+                  </span>
+                </div>
               </div>
 
-              {predictions.length === 0 ? (
+              {isLoading ? (
+                <div className="loading-predictions">
+                  <div className="spinner"></div>
+                  <p>Analyzing incident patterns and generating predictions...</p>
+                </div>
+              ) : predictions.length === 0 ? (
                 <div className="no-predictions">
-                  <div className="prediction-icon">📊</div>
-                  <h3>No predictions available</h3>
-                  <p>As more incidents are reported, AI will generate smart predictions</p>
+                  <div className="prediction-icon">🤖</div>
+                  <h3>Generating Predictions...</h3>
+                  <p>Our AI is analyzing the incident data. This might take a moment.</p>
+                  <div className="prediction-help">
+                    <p><strong>Tip:</strong> Make sure you have incidents reported in the system.</p>
+                    <button onClick={fetchAllData} className="retry-btn">
+                      🔄 Retry Analysis
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -1052,6 +1071,12 @@ function App() {
                         {predictions.filter(p => p.urgency === 'high').length}
                       </span>
                       <span className="prediction-stat-label">High Priority</span>
+                    </div>
+                    <div className="prediction-stat accuracy">
+                      <span className="prediction-stat-number">
+                        {Math.max(...predictions.map(p => p.confidence))}%
+                      </span>
+                      <span className="prediction-stat-label">Max Confidence</span>
                     </div>
                   </div>
 
@@ -1087,7 +1112,15 @@ function App() {
                               </div>
                               {prediction.equipment && (
                                 <div className="evidence-item">
-                                  <strong>Equipment:</strong> {prediction.equipment}
+                                  <strong>Equipment:</strong> 
+                                  <span className="equipment-tag">{prediction.equipment}</span>
+                                </div>
+                              )}
+                              {prediction.predicted_date && (
+                                <div className="evidence-item">
+                                  <strong>Expected:</strong> 
+                                  {new Date(prediction.predicted_date).toLocaleDateString()}
+                                  {prediction.predicted_time && ` at ${prediction.predicted_time}`}
                                 </div>
                               )}
                               {prediction.evidence && (
@@ -1097,10 +1130,10 @@ function App() {
                                     <span> {prediction.evidence.critical_incidents} critical incidents</span>
                                   )}
                                   {prediction.evidence.recent_incidents && (
-                                    <span> {prediction.evidence.recent_incidents} recent incidents</span>
+                                    <span> • {prediction.evidence.recent_incidents} recent incidents</span>
                                   )}
-                                  {prediction.evidence.data_quality && (
-                                    <span> • Data quality: {prediction.evidence.data_quality}</span>
+                                  {prediction.evidence.equipment_incidents && (
+                                    <span> • {prediction.evidence.equipment_incidents} equipment issues</span>
                                   )}
                                 </div>
                               )}
@@ -1114,6 +1147,9 @@ function App() {
                           </button>
                           <button className="action-btn notify">
                             🔔 Notify Technicians
+                          </button>
+                          <button className="action-btn details">
+                            📊 View Details
                           </button>
                         </div>
                       </div>
@@ -1130,6 +1166,10 @@ function App() {
                           plugins: {
                             legend: {
                               display: false
+                            },
+                            title: {
+                              display: true,
+                              text: 'AI Prediction Confidence Levels'
                             }
                           },
                           scales: {
