@@ -3,12 +3,44 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
+
+// Multer configuration for image uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname))
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
 // MongoDB Connection
 mongoose.connect("mongodb://localhost:27017/voltage_guard", {
@@ -39,7 +71,7 @@ const userSchema = new mongoose.Schema({
 const incidentSchema = new mongoose.Schema({
     title: { type: String, required: true },
     category: { type: String, enum: ["electricity", "water", "internet", "hostel", "other"], required: true },
-    subcategory: { type: String, enum: ["voltage_fluctuation", "microblackout", "complete_blackout", "flickering", "other"], default: "voltage_fluctuation" },
+    subcategory: { type: String, enum: ["voltage_fluctuation", "microblackout", "complete_blackout", "flickering", "equipment_failure", "other"], default: "voltage_fluctuation" },
     description: { type: String, required: true },
     severity: { type: String, enum: ["low", "medium", "high", "critical"], default: "medium" },
     status: { type: String, enum: ["new", "assigned", "in_progress", "resolved"], default: "new" },
@@ -54,6 +86,9 @@ const incidentSchema = new mongoose.Schema({
     symptoms: [String],
     affected_devices: [String],
     
+    // Image upload support
+    images: [String],
+    
     location: {
         building: { type: String, required: true },
         floor: String,
@@ -64,6 +99,11 @@ const incidentSchema = new mongoose.Schema({
         }
     },
     
+    equipment: {
+        type: String,
+        enum: ["transformer", "generator", "ups", "switchboard", "wiring", "other"]
+    },
+    
     reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     
@@ -72,9 +112,22 @@ const incidentSchema = new mongoose.Schema({
     resolvedAt: Date
 });
 
+// Analytics Schema for historical data
+const analyticsSchema = new mongoose.Schema({
+    date: { type: Date, required: true },
+    total_incidents: Number,
+    critical_incidents: Number,
+    resolved_incidents: Number,
+    avg_resolution_time: Number,
+    building_stats: Object,
+    category_stats: Object,
+    predictions_generated: Number
+});
+
 // Create Models
 const User = mongoose.model("User", userSchema);
 const Incident = mongoose.model("Incident", incidentSchema);
+const Analytics = mongoose.model("Analytics", analyticsSchema);
 
 // ==================== DUPLICATE DETECTION ====================
 
@@ -145,6 +198,14 @@ const predictVoltageIssues = (incidents) => {
       new Date(inc.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ).length;
 
+    // Equipment-specific analysis
+    const equipmentCounts = {};
+    buildingIncidents.forEach(inc => {
+      if (inc.equipment) {
+        equipmentCounts[inc.equipment] = (equipmentCounts[inc.equipment] || 0) + 1;
+      }
+    });
+
     // Calculate confidence score (0-100)
     let confidence = 0;
     let reason = "";
@@ -162,6 +223,7 @@ const predictVoltageIssues = (incidents) => {
         reason: reason,
         predicted_date: new Date(Date.now() + 24 * 60 * 60 * 1000),
         urgency: confidence > 80 ? "critical" : "high",
+        equipment: "transformer",
         evidence: {
           critical_incidents: criticalCount,
           total_recent: recentIncidents,
@@ -211,19 +273,82 @@ const predictVoltageIssues = (incidents) => {
         }
       });
     }
+
+    // Equipment-specific predictions
+    for (const [equipment, count] of Object.entries(equipmentCounts)) {
+      if (count >= 2) {
+        const equipmentConfidence = Math.min(40 + (count * 20), 90);
+        predictions.push({
+          location: { building },
+          predicted_issue: `Potential ${equipment} maintenance needed`,
+          probability: 65,
+          confidence: equipmentConfidence,
+          reason: `${count} incidents related to ${equipment}`,
+          predicted_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          urgency: count >= 3 ? "high" : "medium",
+          equipment: equipment,
+          evidence: {
+            equipment_incidents: count,
+            maintenance_required: true
+          }
+        });
+      }
+    }
   }
 
   // Sort by confidence (highest first)
   return predictions.sort((a, b) => b.confidence - a.confidence);
 };
 
+// ==================== HISTORICAL TREND ANALYSIS ====================
+
+const analyzeHistoricalTrends = async () => {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const incidents = await Incident.find({
+    createdAt: { $gte: thirtyDaysAgo }
+  });
+
+  const trends = {
+    daily_incidents: {},
+    weekly_patterns: {},
+    building_trends: {},
+    severity_trends: {},
+    seasonal_patterns: {}
+  };
+
+  // Daily incident counts
+  incidents.forEach(incident => {
+    const date = incident.createdAt.toISOString().split('T')[0];
+    trends.daily_incidents[date] = (trends.daily_incidents[date] || 0) + 1;
+  });
+
+  // Weekly patterns (day of week)
+  incidents.forEach(incident => {
+    const dayOfWeek = incident.createdAt.getDay();
+    trends.weekly_patterns[dayOfWeek] = (trends.weekly_patterns[dayOfWeek] || 0) + 1;
+  });
+
+  // Building trends
+  incidents.forEach(incident => {
+    const building = incident.location.building;
+    trends.building_trends[building] = (trends.building_trends[building] || 0) + 1;
+  });
+
+  // Severity trends
+  incidents.forEach(incident => {
+    trends.severity_trends[incident.severity] = (trends.severity_trends[incident.severity] || 0) + 1;
+  });
+
+  return trends;
+};
+
 // ==================== TECHNICIAN MANAGEMENT ====================
 
 // Technician availability and reassignment system
 const technicians = [
-  { id: 1, name: "Rajesh Kumar", skills: ["electrical", "emergency"], available: true, currentTasks: [] },
-  { id: 2, name: "Priya Sharma", skills: ["electrical", "maintenance"], available: true, currentTasks: [] },
-  { id: 3, name: "Ankit Patel", skills: ["emergency", "critical"], available: true, currentTasks: [] }
+  { id: 1, name: "Rajesh Kumar", skills: ["electrical", "emergency"], available: true, currentTasks: [], performance: { resolved: 45, avgTime: 2.1 } },
+  { id: 2, name: "Priya Sharma", skills: ["electrical", "maintenance"], available: true, currentTasks: [], performance: { resolved: 38, avgTime: 1.8 } },
+  { id: 3, name: "Ankit Patel", skills: ["emergency", "critical"], available: true, currentTasks: [], performance: { resolved: 52, avgTime: 2.4 } }
 ];
 
 // Smart technician assignment
@@ -269,13 +394,22 @@ app.get("/", (req, res) => {
             <li>POST /api/incidents - Create incident</li>
             <li>GET <a href="/api/predictions">/api/predictions</a> - Get AI predictions</li>
             <li>GET <a href="/api/technicians">/api/technicians</a> - Get technicians</li>
+            <li>GET <a href="/api/heatmap">/api/heatmap</a> - Get heatmap data</li>
+            <li>GET <a href="/api/analytics/trends">/api/analytics/trends</a> - Get historical trends</li>
         </ul>
     `);
 });
 
 // Incident Routes with duplicate detection and rate limiting
-app.post("/api/incidents", reportLimiter, async (req, res) => {
+app.post("/api/incidents", reportLimiter, upload.array('images', 3), async (req, res) => {
     try {
+        const imagePaths = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+
+        const incidentData = {
+            ...req.body,
+            images: imagePaths
+        };
+
         // Check for similar incidents unless forceSubmit is true
         if (!req.body.forceSubmit) {
             const similarIncident = await detectSimilarIncidents(req.body);
@@ -291,7 +425,7 @@ app.post("/api/incidents", reportLimiter, async (req, res) => {
             }
         }
 
-        const incident = new Incident(req.body);
+        const incident = new Incident(incidentData);
         await incident.save();
         console.log("📝 New incident reported:", incident.title);
         
@@ -314,7 +448,7 @@ app.post("/api/incidents", reportLimiter, async (req, res) => {
 
 app.get("/api/incidents", async (req, res) => {
     try {
-        const incidents = await Incident.find();
+        const incidents = await Incident.find().sort({ createdAt: -1 });
         res.json(incidents);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -344,6 +478,83 @@ app.get("/api/predictions", async (req, res) => {
         const incidents = await Incident.find();
         const predictions = predictVoltageIssues(incidents);
         res.json(predictions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Heatmap Data Endpoint
+app.get("/api/heatmap", async (req, res) => {
+    try {
+        const incidents = await Incident.find();
+        const heatmapData = {};
+        
+        const buildingCoordinates = {
+            'Hostel A': { lat: 28.6129, lng: 77.2295 },
+            'Hostel B': { lat: 28.6130, lng: 77.2300 },
+            'Academic Block': { lat: 28.6128, lng: 77.2290 },
+            'Lab Complex': { lat: 28.6132, lng: 77.2292 },
+            'Library': { lat: 28.6127, lng: 77.2298 },
+            'Admin Block': { lat: 28.6131, lng: 77.2293 }
+        };
+
+        incidents.forEach(incident => {
+            const building = incident.location.building;
+            if (!heatmapData[building]) {
+                heatmapData[building] = {
+                    total: 0,
+                    critical: 0,
+                    recent: 0,
+                    coordinates: buildingCoordinates[building] || { lat: 28.6129, lng: 77.2295 }
+                };
+            }
+            heatmapData[building].total++;
+            if (incident.severity === 'critical') heatmapData[building].critical++;
+            if (new Date(incident.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
+                heatmapData[building].recent++;
+            }
+        });
+        
+        res.json(heatmapData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Historical Trends Endpoint
+app.get("/api/analytics/trends", async (req, res) => {
+    try {
+        const trends = await analyzeHistoricalTrends();
+        res.json(trends);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Complaint Aging Analysis
+app.get("/api/analytics/aging", async (req, res) => {
+    try {
+        const incidents = await Incident.find();
+        const aging = {
+            '0-1 days': 0,
+            '1-3 days': 0,
+            '3-7 days': 0,
+            '1-2 weeks': 0,
+            '2+ weeks': 0
+        };
+        
+        incidents.forEach(incident => {
+            if (incident.status !== 'resolved') {
+                const ageDays = (new Date() - new Date(incident.createdAt)) / (24 * 60 * 60 * 1000);
+                if (ageDays <= 1) aging['0-1 days']++;
+                else if (ageDays <= 3) aging['1-3 days']++;
+                else if (ageDays <= 7) aging['3-7 days']++;
+                else if (ageDays <= 14) aging['1-2 weeks']++;
+                else aging['2+ weeks']++;
+            }
+        });
+        
+        res.json(aging);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -388,5 +599,6 @@ app.listen(PORT, () => {
     console.log(`⚡ VoltageGuard Server running on port ${PORT}`);
     console.log(`📍 API: http://localhost:${PORT}`);
     console.log(`🔮 Predictions: http://localhost:${PORT}/api/predictions`);
-    console.log(`👨‍🔧 Technicians: http://localhost:${PORT}/api/technicians`);
+    console.log(`🏢 Heatmap: http://localhost:${PORT}/api/heatmap`);
+    console.log(`📊 Analytics: http://localhost:${PORT}/api/analytics/trends`);
 });

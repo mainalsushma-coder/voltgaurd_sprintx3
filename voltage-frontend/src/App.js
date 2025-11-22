@@ -54,13 +54,21 @@ function App() {
   });
   const [liveSavings, setLiveSavings] = useState(478000);
 
+  // NEW FEATURES STATE
+  const [heatmapData, setHeatmapData] = useState({});
+  const [historicalTrends, setHistoricalTrends] = useState({});
+  const [agingData, setAgingData] = useState({});
+  const [selectedImage, setSelectedImage] = useState(null);
+
   // Form state
   const [formData, setFormData] = useState({
     title: '',
     category: 'electricity',
     description: '',
     severity: 'medium',
-    location: { building: '', room: '' }
+    location: { building: '', room: '', gps: { lat: null, lng: null } },
+    equipment: '',
+    images: []
   });
 
   // ==================== WINNING COMPONENTS ====================
@@ -222,66 +230,152 @@ function App() {
     );
   };
 
+  // Campus Heatmap Component
+  const CampusHeatmap = () => {
+    const getHeatmapIntensity = (recentCount) => {
+      if (recentCount >= 5) return 'critical';
+      if (recentCount >= 3) return 'high';
+      if (recentCount >= 1) return 'medium';
+      return 'low';
+    };
+
+    return (
+      <div className="heatmap-card">
+        <h3>🏢 Campus Issue Heatmap</h3>
+        <div className="heatmap-grid">
+          {Object.entries(heatmapData).map(([building, data]) => (
+            <div key={building} className={`heatmap-item heatmap-${getHeatmapIntensity(data.recent)}`}>
+              <div className="building-name">{building}</div>
+              <div className="incident-count">{data.recent} recent issues</div>
+              <div className="critical-count">{data.critical} critical</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Historical Trends Component
+  const HistoricalTrends = () => {
+    const weeklyData = {
+      labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      datasets: [
+        {
+          label: 'Incidents by Day',
+          data: historicalTrends.weekly_patterns ? Object.values(historicalTrends.weekly_patterns) : [5, 8, 6, 9, 7, 4, 3],
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    };
+
+    return (
+      <div className="trends-card">
+        <h3>📈 Historical Trends (30 Days)</h3>
+        <div className="trends-grid">
+          <div className="trend-item">
+            <div className="trend-value">{historicalTrends.daily_incidents ? Object.values(historicalTrends.daily_incidents).reduce((a, b) => a + b, 0) : 42}</div>
+            <div className="trend-label">Total Incidents</div>
+          </div>
+          <div className="trend-item">
+            <div className="trend-value">{historicalTrends.severity_trends?.critical || 8}</div>
+            <div className="trend-label">Critical Issues</div>
+          </div>
+          <div className="trend-item">
+            <div className="trend-value">{Math.max(...(historicalTrends.weekly_patterns ? Object.values(historicalTrends.weekly_patterns) : [5, 8, 6, 9, 7, 4, 3]))}</div>
+            <div className="trend-label">Peak Day Count</div>
+          </div>
+        </div>
+        
+        <div className="trend-chart">
+          <h4>Weekly Pattern</h4>
+          <div className="chart-container-small">
+            <Line 
+              data={weeklyData}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Complaint Aging Component
+  const ComplaintAging = () => {
+    return (
+      <div className="aging-card">
+        <h3>⏳ Complaint Aging Analysis</h3>
+        <div className="aging-bars">
+          {Object.entries(agingData).map(([range, count]) => (
+            <div key={range} className="aging-bar">
+              <div className="aging-range">{range}</div>
+              <div className="aging-count">{count} incidents</div>
+              <div 
+                className="aging-progress" 
+                style={{ width: `${(count / Math.max(...Object.values(agingData))) * 100}%` }}
+              ></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // ==================== EXISTING FUNCTIONALITY ====================
 
-  // Fetch incidents with loading state
-  const fetchIncidents = useCallback(async () => {
+  // Fetch all data
+  const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/incidents');
-      const data = await response.json();
-      setIncidents(data);
-      
-      // Calculate stats
-      const total = data.length;
-      const critical = data.filter(inc => inc.severity === 'critical').length;
-      const resolved = data.filter(inc => inc.status === 'resolved').length;
-      const inProgress = data.filter(inc => inc.status === 'in-progress').length;
-      setStats({ total, critical, resolved, inProgress });
+      const [incidentsRes, predictionsRes, heatmapRes, trendsRes, agingRes] = await Promise.all([
+        fetch('http://localhost:3000/api/incidents'),
+        fetch('http://localhost:3000/api/predictions'),
+        fetch('http://localhost:3000/api/heatmap'),
+        fetch('http://localhost:3000/api/analytics/trends'),
+        fetch('http://localhost:3000/api/analytics/aging')
+      ]);
 
-      // Add notification for new critical incidents
-      const newCritical = data.filter(inc => 
-        inc.severity === 'critical' && 
-        new Date(inc.createdAt) > new Date(Date.now() - 30000)
-      );
-      
-      if (newCritical.length > 0) {
-        newCritical.forEach(incident => {
-          addNotification(`🚨 New Critical Incident: ${incident.title}`, 'critical');
-        });
-      }
+      const incidentsData = await incidentsRes.json();
+      const predictionsData = await predictionsRes.json();
+      const heatmapData = await heatmapRes.json();
+      const trendsData = await trendsRes.json();
+      const agingData = await agingRes.json();
+
+      setIncidents(incidentsData);
+      setPredictions(predictionsData);
+      setHeatmapData(heatmapData);
+      setHistoricalTrends(trendsData);
+      setAgingData(agingData);
+
+      // Calculate stats
+      const total = incidentsData.length;
+      const critical = incidentsData.filter(inc => inc.severity === 'critical').length;
+      const resolved = incidentsData.filter(inc => inc.status === 'resolved').length;
+      const inProgress = incidentsData.filter(inc => inc.status === 'in-progress').length;
+      setStats({ total, critical, resolved, inProgress, predicted: predictionsData.length });
 
     } catch (error) {
-      console.error('Error fetching incidents:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Fetch predictions
-  const fetchPredictions = useCallback(async () => {
-    try {
-      const response = await fetch('http://localhost:3000/api/predictions');
-      const data = await response.json();
-      setPredictions(data);
-      setStats(prev => ({ ...prev, predicted: data.length }));
-    } catch (error) {
-      console.error('Error fetching predictions:', error);
-    }
-  }, []);
-
   // Auto-refresh every 20 seconds
   useEffect(() => {
-    fetchIncidents();
-    fetchPredictions();
+    fetchAllData();
     
     const interval = setInterval(() => {
-      fetchIncidents();
-      fetchPredictions();
+      fetchAllData();
     }, 20000);
     
     return () => clearInterval(interval);
-  }, [fetchIncidents, fetchPredictions]);
+  }, [fetchAllData]);
 
   // Auto-remove notifications
   useEffect(() => {
@@ -304,39 +398,104 @@ function App() {
     setNotifications(prev => [...prev, newNotification]);
   };
 
-  // Enhanced form submission with error handling
+  // Image Upload Handler
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 3) {
+      addNotification('❌ Maximum 3 images allowed', 'error');
+      return;
+    }
+
+    const imageUrls = files.map(file => URL.createObjectURL(file));
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, ...imageUrls]
+    }));
+    addNotification(`✅ ${files.length} image(s) added`, 'success');
+  };
+
+  const removeImage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
+  // GPS Location Handler
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      addNotification('❌ Geolocation is not supported by this browser', 'error');
+      return;
+    }
+
+    addNotification('📍 Getting your location...', 'info');
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setFormData(prev => ({
+          ...prev,
+          location: {
+            ...prev.location,
+            gps: { lat: latitude, lng: longitude }
+          }
+        }));
+        addNotification('✅ Location captured successfully!', 'success');
+      },
+      (error) => {
+        console.error('GPS Error:', error);
+        addNotification('❌ Failed to get location. Please enter manually.', 'error');
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  // Enhanced form submission with image upload
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', formData.title);
+      formDataToSend.append('category', formData.category);
+      formDataToSend.append('description', formData.description);
+      formDataToSend.append('severity', formData.severity);
+      formDataToSend.append('location[building]', formData.location.building);
+      formDataToSend.append('location[room]', formData.location.room);
+      formDataToSend.append('equipment', formData.equipment);
+
+      // Append images
+      formData.images.forEach((imageUrl, index) => {
+        // Convert data URL to blob if needed
+        if (imageUrl.startsWith('blob:')) {
+          fetch(imageUrl)
+            .then(res => res.blob())
+            .then(blob => {
+              formDataToSend.append('images', blob, `image-${index}.jpg`);
+            });
+        }
+      });
+
       const response = await fetch('http://localhost:3000/api/incidents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          status: 'new'
-        })
+        body: formDataToSend,
       });
       
       const data = await response.json();
       
       if (!response.ok) {
-        // Handle specific error cases
         if (response.status === 409) {
-          // Duplicate incident - ask user if they want to proceed
           const proceed = window.confirm(
             `⚠️ Similar incident already exists!\n\n"${data.similarIncident.title}"\nStatus: ${data.similarIncident.status}\n\nDo you want to report this as a new incident anyway?`
           );
           if (proceed) {
-            // Force submit by adding a flag to bypass duplicate check
-            await forceSubmitIncident();
+            await forceSubmitIncident(formDataToSend);
           }
           return;
         }
         
         if (response.status === 429) {
-          // Rate limit exceeded
           addNotification(`⏳ ${data.error}`, 'error');
           return;
         }
@@ -344,17 +503,16 @@ function App() {
         throw new Error(data.error || 'Failed to submit incident');
       }
       
-      // Success case
       addNotification(`✅ Incident reported successfully: ${data.title}`, 'success');
       setFormData({
         title: '', category: 'electricity', description: '', severity: 'medium',
-        location: { building: '', room: '' }
+        location: { building: '', room: '', gps: { lat: null, lng: null } },
+        equipment: '',
+        images: []
       });
-      fetchIncidents();
-      fetchPredictions();
+      fetchAllData();
       
     } catch (error) {
-      // Network errors or other issues
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         addNotification('❌ Network error: Please check your internet connection and try again', 'error');
       } else {
@@ -365,17 +523,13 @@ function App() {
     }
   };
 
-  // Force submit without duplicate check
-  const forceSubmitIncident = async () => {
+  const forceSubmitIncident = async (formData) => {
+    formData.append('forceSubmit', 'true');
+    
     try {
       const response = await fetch('http://localhost:3000/api/incidents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          status: 'new',
-          forceSubmit: true // Add flag to bypass duplicate check
-        })
+        body: formData,
       });
       
       if (response.ok) {
@@ -383,10 +537,11 @@ function App() {
         addNotification(`✅ Incident reported: ${data.title}`, 'success');
         setFormData({
           title: '', category: 'electricity', description: '', severity: 'medium',
-          location: { building: '', room: '' }
+          location: { building: '', room: '', gps: { lat: null, lng: null } },
+          equipment: '',
+          images: []
         });
-        fetchIncidents();
-        fetchPredictions();
+        fetchAllData();
       }
     } catch (error) {
       addNotification(`❌ Error: ${error.message}`, 'error');
@@ -449,7 +604,7 @@ function App() {
       if (response.ok) {
         const incident = incidents.find(inc => inc._id === incidentId);
         addNotification(`🔄 Status updated: ${incident.title} → ${newStatus}`, 'info');
-        fetchIncidents();
+        fetchAllData();
       } else {
         throw new Error('Failed to update status');
       }
@@ -505,6 +660,16 @@ function App() {
     return 'low';
   };
 
+  // Image Modal
+  const ImageModal = ({ image, onClose }) => (
+    <div className="image-modal-overlay" onClick={onClose}>
+      <div className="image-modal-content" onClick={e => e.stopPropagation()}>
+        <button className="close-modal" onClick={onClose}>×</button>
+        <img src={image} alt="Incident" />
+      </div>
+    </div>
+  );
+
   return (
     <div className="app">
       {/* Notifications */}
@@ -518,6 +683,9 @@ function App() {
           </div>
         ))}
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && <ImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />}
 
       {/* Loading Overlay */}
       {isLoading && (
@@ -634,6 +802,24 @@ function App() {
                 </div>
 
                 <div className="form-group">
+                  <label>Equipment Type</label>
+                  <select 
+                    name="equipment" 
+                    value={formData.equipment} 
+                    onChange={handleChange}
+                    disabled={isLoading}
+                  >
+                    <option value="">Select Equipment</option>
+                    <option value="transformer">Transformer</option>
+                    <option value="generator">Generator</option>
+                    <option value="ups">UPS</option>
+                    <option value="switchboard">Switchboard</option>
+                    <option value="wiring">Wiring</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label>Severity Level</label>
                   <select 
                     name="severity" 
@@ -659,6 +845,45 @@ function App() {
                     required
                     disabled={isLoading}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>📷 Upload Images (Max 3)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="image-upload"
+                    disabled={isLoading || formData.images.length >= 3}
+                  />
+                  <div className="image-preview-grid">
+                    {formData.images.map((image, index) => (
+                      <div key={index} className="image-preview-item">
+                        <img src={image} alt={`Preview ${index}`} />
+                        <button type="button" onClick={() => removeImage(index)} className="remove-image">
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>📍 Get Current Location</label>
+                  <button 
+                    type="button" 
+                    className="gps-btn"
+                    onClick={getCurrentLocation}
+                    disabled={isLoading}
+                  >
+                    📍 Use My Location
+                  </button>
+                  {formData.location.gps && formData.location.gps.lat && (
+                    <div className="gps-coordinates">
+                      ✅ Location: {formData.location.gps.lat.toFixed(4)}, {formData.location.gps.lng.toFixed(4)}
+                    </div>
+                  )}
                 </div>
 
                 <button 
@@ -698,7 +923,7 @@ function App() {
                     <option value="medium">Medium</option>
                     <option value="low">Low</option>
                   </select>
-                  <button onClick={fetchIncidents} className="refresh-btn" disabled={isLoading}>
+                  <button onClick={fetchAllData} className="refresh-btn" disabled={isLoading}>
                     {isLoading ? '🔄 Refreshing...' : '🔄 Refresh'}
                   </button>
                 </div>
@@ -706,7 +931,7 @@ function App() {
 
               <div className="incidents-table">
                 <div className="table-header">
-                  <div className="table-cell">Title</div>
+                  <div className="table-cell">Title & Images</div>
                   <div className="table-cell">Location</div>
                   <div className="table-cell">Severity</div>
                   <div className="table-cell">Status</div>
@@ -725,11 +950,25 @@ function App() {
                         <div className="table-cell">
                           <div className="incident-title">{incident.title}</div>
                           <div className="incident-desc">{incident.description}</div>
+                          {incident.images && incident.images.length > 0 && (
+                            <div className="incident-images">
+                              {incident.images.map((img, idx) => (
+                                <img 
+                                  key={idx} 
+                                  src={`http://localhost:3000${img}`} 
+                                  alt={`Incident ${idx}`}
+                                  className="incident-thumbnail"
+                                  onClick={() => setSelectedImage(`http://localhost:3000${img}`)}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="table-cell">
                           <div className="location">
                             <strong>🏢 {incident.location.building}</strong>
                             {incident.location.room && <div>🚪 Room {incident.location.room}</div>}
+                            {incident.equipment && <div className="equipment-badge">{incident.equipment}</div>}
                           </div>
                         </div>
                         <div className="table-cell">
@@ -846,6 +1085,11 @@ function App() {
                               <div className="evidence-item">
                                 <strong>Reason:</strong> {prediction.reason}
                               </div>
+                              {prediction.equipment && (
+                                <div className="evidence-item">
+                                  <strong>Equipment:</strong> {prediction.equipment}
+                                </div>
+                              )}
                               {prediction.evidence && (
                                 <div className="evidence-details">
                                   <strong>Evidence:</strong> 
@@ -944,6 +1188,10 @@ function App() {
                   <div className="tech-info">
                     <h3>Rajesh Kumar</h3>
                     <p>Senior Electrical Technician</p>
+                    <div className="tech-performance">
+                      <span>✅ 45 resolved</span>
+                      <span>⏱️ 2.1h avg</span>
+                    </div>
                     <div className="tech-skills">
                       <span className="skill-tag">Voltage Systems</span>
                       <span className="skill-tag">Transformers</span>
@@ -965,6 +1213,10 @@ function App() {
                   <div className="tech-info">
                     <h3>Priya Sharma</h3>
                     <p>Electrical Maintenance Expert</p>
+                    <div className="tech-performance">
+                      <span>✅ 38 resolved</span>
+                      <span>⏱️ 1.8h avg</span>
+                    </div>
                     <div className="tech-skills">
                       <span className="skill-tag">Circuit Analysis</span>
                       <span className="skill-tag">Preventive Maintenance</span>
@@ -986,6 +1238,10 @@ function App() {
                   <div className="tech-info">
                     <h3>Ankit Patel</h3>
                     <p>Emergency Response Specialist</p>
+                    <div className="tech-performance">
+                      <span>✅ 52 resolved</span>
+                      <span>⏱️ 2.4h avg</span>
+                    </div>
                     <div className="tech-skills">
                       <span className="skill-tag">Critical Repairs</span>
                       <span className="skill-tag">24/7 Support</span>
@@ -1007,6 +1263,10 @@ function App() {
                   <div className="tech-info">
                     <h3>Sanjay Verma</h3>
                     <p>Electrical Systems Analyst</p>
+                    <div className="tech-performance">
+                      <span>✅ 41 resolved</span>
+                      <span>⏱️ 2.2h avg</span>
+                    </div>
                     <div className="tech-skills">
                       <span className="skill-tag">Data Analysis</span>
                       <span className="skill-tag">Predictive Maintenance</span>
@@ -1100,10 +1360,12 @@ function App() {
               <div className="advanced-dashboard">
                 <div className="dashboard-column">
                   <LivePredictionDemo />
+                  <CampusHeatmap />
                 </div>
                 
                 <div className="dashboard-column">
-                  {/* Space for more winning components */}
+                  <HistoricalTrends />
+                  <ComplaintAging />
                 </div>
               </div>
 
