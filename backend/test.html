@@ -7,6 +7,8 @@
     <h1>Test Backend API</h1>
     <button onclick="sendData()">Send Test Data</button>
     <button onclick="getData()">Get Data</button>
+    <button onclick="testIncidentAPI()">Test Incident API</button>
+
     <div id="result"></div>
 
     <script>
@@ -43,6 +45,35 @@
 
 // Run test when page loads
 testConnection();
+
+async function testIncidentAPI() {
+    try {
+        const response = await fetch('http://localhost:3000/api/incidents', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "title": "Voltage Drop - Hostel B",
+                "category": "electricity", 
+                "description": "Lights flickering during evening hours",
+                "severity": "high",
+                "location": {
+                    "building": "Hostel B",
+                    "room": "205"
+                }
+            })
+        });
+        
+        const data = await response.json();
+        console.log('✅ Incident created:', data);
+        alert('Incident reported successfully!');
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Failed to report incident');
+    }
+}
+
     </script>
 </body>
 </html>
