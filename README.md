@@ -5,10 +5,14 @@
 
 **Smart Predictive Maintenance System for Campus Power Management**
 
+
+---
+
 ## Live Demo
 
 * **Web Application:** [https://spiffy-daifuku-d880aa.netlify.app/](https://spiffy-daifuku-d880aa.netlify.app/)
 * **Backend API:** [https://voltgaurd.mainalsushma.workers.dev](https://voltgaurd.mainalsushma.workers.dev)
+* **Demo Video:** [Watch it here](https://1drv.ms/v/c/71671ec335297c58/IQCL-ggE0JRQS4sk7mOc21P2ASIfIp25nJXK7v9TKf4hu4w)
 
 ---
 
