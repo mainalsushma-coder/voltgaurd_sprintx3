@@ -1,6 +1,6 @@
 {
-  "name": "voltgaurd", 
-  "compatibility_date": "2024-11-23",
+  "name": "voltgaurd",
+  "compatibility_date": "2024-01-01",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "server.js"
+  "main": "backend/server.js"
 }
