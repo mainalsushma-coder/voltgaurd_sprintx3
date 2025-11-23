@@ -333,11 +333,11 @@ function App() {
     setIsLoading(true);
     try {
       const [incidentsRes, predictionsRes, heatmapRes, trendsRes, agingRes] = await Promise.all([
-        fetch('http://localhost:3000/api/incidents'),
-        fetch('http://localhost:3000/api/predictions'),
-        fetch('http://localhost:3000/api/heatmap'),
-        fetch('http://localhost:3000/api/analytics/trends'),
-        fetch('http://localhost:3000/api/analytics/aging')
+        fetch('https://voltgaurd.mainalsushma.workers.dev/api/incidents'),
+        fetch('https://voltgaurd.mainalsushma.workers.dev/api/predictions'),
+        fetch('https://voltgaurd.mainalsushma.workers.dev/api/heatmap'),
+        fetch('https://voltgaurd.mainalsushma.workers.dev/api/analytics/trends'),
+        fetch('https://voltgaurd.mainalsushma.workers.dev/api/analytics/aging')
       ]);
 
       const incidentsData = await incidentsRes.json();
@@ -477,7 +477,7 @@ function App() {
         }
       });
 
-      const response = await fetch('http://localhost:3000/api/incidents', {
+      const response = await fetch('https://voltgaurd.mainalsushma.workers.dev/api/incidents', {
         method: 'POST',
         body: formDataToSend,
       });
@@ -527,7 +527,7 @@ function App() {
     formData.append('forceSubmit', 'true');
     
     try {
-      const response = await fetch('http://localhost:3000/api/incidents', {
+      const response = await fetch('https://voltgaurd.mainalsushma.workers.dev/api/incidents', {
         method: 'POST',
         body: formData,
       });
@@ -595,7 +595,7 @@ function App() {
 
   const updateIncidentStatus = async (incidentId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/incidents/${incidentId}`, {
+      const response = await fetch(`https://voltgaurd.mainalsushma.workers.dev/api/incidents/${incidentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -955,10 +955,10 @@ function App() {
                               {incident.images.map((img, idx) => (
                                 <img 
                                   key={idx} 
-                                  src={`http://localhost:3000${img}`} 
+                                  src={`https://voltgaurd.mainalsushma.workers.dev${img}`} 
                                   alt={`Incident ${idx}`}
                                   className="incident-thumbnail"
-                                  onClick={() => setSelectedImage(`http://localhost:3000${img}`)}
+                                  onClick={() => setSelectedImage(`https://voltgaurd.mainalsushma.workers.dev${img}`)}
                                 />
                               ))}
                             </div>
