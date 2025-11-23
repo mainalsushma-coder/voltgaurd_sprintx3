@@ -1,5 +1,13 @@
 {
-  "name":  "voltgaurd",
-  "compatibility_date": "2025-11-23",
-  "main": "voltage-frontend/src/App.js"
+  "name": "voltgaurd",
+  "compatibility_date": "2024-01-01",
+  "node_compat": true,
+  
+  "build": {
+    "command": "echo 'Skipping frontend build for Worker deployment'"
+  },
+  
+  "bundle": {
+    "external": ["react", "react-dom", "react-chartjs-2", "chart.js"]
+  }
 }
