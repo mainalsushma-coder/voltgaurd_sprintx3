@@ -1,0 +1,17 @@
+{
+  "name": "microblackout-backend",
+  "version": "1.0.0",
+  "description": "Voltage tracking backend",
+  "main": "server.js",
+  "scripts": {
+    "build": "cd voltage-frontend && npm install && npm run build",
+    "deploy": "npm run build && npx wrangler deploy"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "mongoose": "^8.20.1",
+    "multer": "^2.0.2"
+  }
+}

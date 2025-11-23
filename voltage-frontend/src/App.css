@@ -485,7 +485,7 @@ textarea {
 
 .status-badge.new { background: #eff6ff; color: #1d4ed8; }
 .status-badge.assigned { background: #f0f9ff; color: #0ea5e9; }
-.status-badge['in-progress'] { background: #fffbeb; color: #d97706; }
+.status-badge[data-status="in-progress"] { background: #fffbeb; color: #d97706; }
 .status-badge.resolved { background: #f0fdf4; color: #16a34a; }
 
 .time {
