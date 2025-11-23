@@ -1,13 +1,6 @@
 {
-  "name": "voltgaurd",
-  "compatibility_date": "2024-01-01",
-  "node_compat": true,
-  
-  "build": {
-    "command": "echo 'Skipping frontend build for Worker deployment'"
-  },
-  
-  "bundle": {
-    "external": ["react", "react-dom", "react-chartjs-2", "chart.js"]
-  }
+  "name": "voltgaurd", 
+  "compatibility_date": "2024-11-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "server.js"
 }
