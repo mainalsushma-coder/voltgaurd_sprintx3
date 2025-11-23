@@ -1,0 +1,5 @@
+{
+  "name": "voltguard-worker",
+  "compatibility_date": "2025-11-23",
+  "main": "voltage-frontend/src/App.js"
+}

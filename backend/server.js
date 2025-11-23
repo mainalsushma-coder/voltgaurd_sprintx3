@@ -8,15 +8,27 @@ const fs = require('fs');
 
 const app = express();
 
-// Middleware
+
+
+
+// Enable CORS for all routes
 app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+
+// Or more specific CORS configuration
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'ngrok-skip-browser-warning']
+}));
 
 // Create uploads directory if it doesn't exist
 if (!fs.existsSync('uploads')) {
     fs.mkdirSync('uploads');
 }
+// In your backend (Node.js/Express)
+
+
+
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -61,6 +73,7 @@ db.once("open", () => {
     console.log("✅ Connected to MongoDB");
     seedSampleData();
 });
+
 
 // Database Schema
 const incidentSchema = new mongoose.Schema({
